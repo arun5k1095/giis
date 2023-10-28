@@ -7,7 +7,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QPushButton, QWidget, QVBoxLayout, QFileDialog,
-    QTabWidget, QComboBox, QGroupBox, QFormLayout, QScrollArea, QHBoxLayout, QLabel, QSpacerItem, QSizePolicy, QTextBrowser
+    QTabWidget, QComboBox, QGroupBox, QFormLayout, QScrollArea,QDialog, QHBoxLayout, QLabel,\
+    QSpacerItem, QSizePolicy, QTextBrowser,QCheckBox
 )
 from PyQt5.QtGui import QPixmap
 
@@ -162,7 +163,7 @@ left_sidebar = QGroupBox("")
 left_layout = QVBoxLayout(left_sidebar)
 
 # Create Load Excel button
-load_excel_button = QPushButton("Load File")
+load_excel_button = QPushButton("Load Audit tracking File")
 load_excel_button.setStyleSheet(
     "QPushButton {"
     "background-color: #007ACC;"
@@ -208,6 +209,10 @@ left_layout.addWidget(visualization_combo)
 filter_group = QGroupBox("Filters")
 filter_layout = QFormLayout(filter_group)
 
+filter_groupPV2 = QGroupBox("Pv2 Filters")
+filter_layoutPV2 = QFormLayout(filter_groupPV2)
+
+
 # Create filter combo boxes
 brand_filter_combo = QComboBox()
 geo_filter_combo = QComboBox()
@@ -233,6 +238,25 @@ apply_filter_button.setStyleSheet(
     "}"
 )
 
+
+apply_filter_buttonPV2 = QPushButton("Apply Filters")
+apply_filter_buttonPV2.setStyleSheet(
+    "QPushButton {"
+    "background-color: #007ACC;"
+    "color: white;"
+    "border: none;"
+    "border-radius: 4px;"
+    "padding: 10px 20px;"
+    "font-size: 16px;"
+    "}"
+    "QPushButton:hover {"
+    "background-color: #005E9C;"
+    "}"
+    "QPushButton:pressed {"
+    "background-color: #004A80;"
+    "}"
+)
+
 # Add filter combo boxes and Apply Filters button to filter layout
 filter_layout.addRow("Brand:", brand_filter_combo)
 filter_layout.addRow("GEO:", geo_filter_combo)
@@ -240,8 +264,128 @@ filter_layout.addRow("Campus:", campus_filter_combo)
 filter_layout.addRow("Department:", Department_filter_combo)
 filter_layout.addRow(apply_filter_button)
 
+
+
+def ArbitratePV2():
+    global df,canvas2
+
+    canvas2.figure.clear()
+
+    main_window.update()
+
+    if visualization_combo2.currentText() == "Total Monthly Pv2 Scores":
+        plot_total_all_monthly()
+    elif visualization_combo2.currentText() == "Parameters wise Pv2 Scores":
+        filtered_rows = df[df['Unit of measurement'] == 'Sub Total']
+        # filtered_rows.to_csv("a.csv")
+        plot_monthly_stats_stacked(filtered_rows , "Criteria of assessment",filtered_months , canvas2)
+    elif visualization_combo2.currentText() == "Criteria-Wise Monthly Total Scores":
+            # filtered_rows = df[df['Criteria of assessment'] == AssessmentCriterias.currentText()]
+            # plot_monthly_stats_pie()
+            filtered_rows = df[df['Unit of measurement'] == 'Sub Total'].copy()
+            filtered_rows = filtered_rows.set_index("Criteria of assessment")
+            # filtered_rows.to_csv("a.csv")
+            print(filtered_rows)
+            plot_monthly_stats_stacked(filtered_rows, "Criteria of assessment", filtered_months, canvas2)
+
+def UpdateAssParameters():
+    Criteria = AssessmentCriterias.currentText()
+    AssessmentParameters.addItems(set(df[df["Criteria of assessment"] == Criteria]["Parameters"].unique().tolist()+["All"]))
+    main_window.update()
+
+AssessmentCriterias = QComboBox()
+AssessmentParameters = QComboBox()
+AssessmentParameters.currentIndexChanged.connect(UpdateAssParameters)
+
+# Initialize the list to store selected months
+selected_months = []
+filtered_months = []
+
+def open_month_selection_dialog():
+    # Create a dialog to select months
+    dialog = QDialog(main_window)
+    dialog.setWindowTitle("Select Months")
+    # Apply the Fusion style to the dialog
+    dialog.setStyleSheet("QDialog { background-color: white; }")
+
+    # Set the width of the dialog (adjust as needed)
+    dialog.setGeometry(100, 100, 400, 300)
+
+    # Create checkboxes for each month
+    months = {
+        "January": -13,
+        "February": -12,
+        "March": -11,
+        "April": -10,
+        "May": -9,
+        "June": -8,
+        "July": -7,
+        "August": -6,
+        "September": -5,
+        "October": -4,
+        "November": -3,
+        "December": -2
+    }
+    checkboxes = []
+
+    for month in months.keys():
+        checkbox = QCheckBox(month)
+        checkbox.setChecked(month in selected_months)  # Check the boxes based on the initial selection
+        checkbox.stateChanged.connect(lambda state, month=month: update_selected_months(month, state))
+        checkboxes.append(checkbox)
+
+    # Check the boxes based on the previous selection
+    for checkbox in checkboxes:
+        if checkbox.text() in selected_months:
+            checkbox.setChecked(True)
+
+    # Create a layout for the checkboxes
+    layout = QVBoxLayout()
+    for checkbox in checkboxes:
+        layout.addWidget(checkbox)
+
+    def save_and_close_dialog():
+        filtered_months.clear()
+        # Update the selected_months list and print it
+        selected_months.clear()
+        for checkbox in checkboxes:
+            if checkbox.isChecked():
+                selected_months.append(checkbox.text())
+                filtered_months.append(months[checkbox.text()])
+        dialog.accept()
+
+    # Create a "Save" button to save the selection
+    save_button = QPushButton("Save")
+    save_button.clicked.connect(save_and_close_dialog)
+
+    layout.addWidget(save_button)
+    dialog.setLayout(layout)
+
+    # Show the dialog
+    dialog.exec_()
+
+def update_selected_months(month, state):
+    if state == 2:  # 2 corresponds to Checked state
+        selected_months.append(month)
+    else:
+        selected_months.remove(month)
+
+select_months_button = QPushButton("Select Months")
+select_months_button.clicked.connect(open_month_selection_dialog)
+
+CriteriaParameters = QComboBox()
+
+filter_layoutPV2.addRow("Select Months:", select_months_button)
+filter_layoutPV2.addRow("Assessment Criteria:", AssessmentCriterias)
+filter_layoutPV2.addRow("Criteria Parameters:", AssessmentParameters)
+# filter_layoutPV2.addRow("Months:", campus_filter_combo)
+# filter_layoutPV2.addRow("Department:", Department_filter_combo)
+filter_layoutPV2.addRow(apply_filter_buttonPV2)
+apply_filter_buttonPV2.clicked.connect(ArbitratePV2)
 # Add filter group to left layout
+
 left_layout.addWidget(filter_group)
+left_layout.addWidget(filter_groupPV2)
 
 # Spacer to create space between the widgets
 spacer = QSpacerItem(20, 40, QSizePolicy.Minimum, QSizePolicy.Expanding)
@@ -309,40 +453,46 @@ df=pandas.DataFrame()
 
 
 def plot_total_all_monthly():
+    global canvas2
+    # canvas2 = FigureCanvas(Figure(figsize=(8, 6)))
+    canvas2.figure.clear()
+    main_window.update()
+    canvas2.update()
     total_rows = df[df['Unit of measurement'] == 'Total']
 
     # Extract the last row containing totals for each month
-    totals_row = total_rows.iloc[-1, len(df.columns)-12 : -1]  # Assuming the month columns start from index 8 to 20
+    totals_row = total_rows.iloc[-1, filtered_months]  # Assuming the month columns start from index 8 to 20
 
     # Create a more beautiful and descriptive bar plot
-    plt.figure(figsize=(12, 6))
-    sns.set(style="whitegrid")  # Use Seaborn for a more attractive style
+
+    fig = canvas2.figure
+    ax = fig.add_subplot(111)
 
     # Customize the color palette for the bars
     colors = sns.color_palette("Set2", len(totals_row))
 
     # Create the bar plot
-    plt.bar(range(len(totals_row)), totals_row, color=colors, alpha=0.7)
-    plt.xlabel('Months')
-    plt.ylabel('Overall Total')
-    plt.title('Monthly Totals for 2023', fontsize=16)
+    ax.bar(range(len(totals_row)), totals_row, color=colors, alpha=0.7)
+    ax.set_xlabel('Months')
+    ax.set_ylabel('Overall Total')
+    ax.set_title('Monthly Totals for 2023', fontsize=16)
 
     # Add data labels on top of the bars
     for i, total in enumerate(totals_row):
-        plt.text(i, total, f'{total:.0f}', ha='center', va='bottom', fontsize=12)
+        ax.text(i, total, f'{total:.0f}', ha='center', va='bottom', fontsize=12)
 
     # Customize the x-axis labels
-    plt.xticks(range(len(totals_row)), df.columns[len(df.columns)-12 : -1], rotation=45)
-    plt.tight_layout()  # Ensure the labels are not cut off
+    ax.set_xticks(range(len(totals_row)))
+    ax.set_xticklabels(selected_months, rotation=45)
 
     # Show the plot with a grid
     sns.despine(left=True, bottom=True)  # Remove spines on the left and bottom
-    plt.grid(axis='y', linestyle='--', alpha=0.7)
-
-    # Display the plot
-    plt.show()
+    ax.grid(axis='y', linestyle='--', alpha=0.7)
+    main_window.update()
+    canvas2.update()
 
 def plot_monthly_stats_pie():
+
     plt.figure(figsize=(12, 6))
     sns.set(style="whitegrid")  # Use Seaborn for an attractive style
 
@@ -351,11 +501,11 @@ def plot_monthly_stats_pie():
 
     # Width of each bar group
     bar_width = 0.15
-    bar_positions = range(len(df.columns[len(df.columns) - 13: -1]))
+    bar_positions = range(len(selected_months))
 
     for index, row in enumerate(filtered_rows.iterrows()):
         _, row = row
-        totals_row = row[len(df.columns) - 13:-1]
+        totals_row = row.iloc[:,filtered_months]
         bar_positions_grouped = [pos + index * bar_width for pos in bar_positions]
 
         # Create the grouped bar
@@ -373,8 +523,7 @@ def plot_monthly_stats_pie():
     # plt.legend(bbox_to_anchor=(1.05, 1), loc='upper right')
 
     # Customize the x-axis labels
-    plt.xticks([pos + (len(filtered_rows) - 1) * bar_width / 2 for pos in bar_positions],
-               df.columns[len(df.columns) - 13: -1], rotation=45)
+    # ax.set_xticks([pos for pos in bar_positions], df.columns[filtered_months], rotation=45)
 
     # Get the current axes
     ax = plt.gca()
@@ -385,63 +534,56 @@ def plot_monthly_stats_pie():
 
     # Display the plot
     plt.show()
-def plot_monthly_stats_stacked():
 
-    # Create a grouped bar plot with values on top
-    plt.figure(figsize=(12, 6))
-    sns.set(style="whitegrid")  # Use Seaborn for an attractive style
+def plot_monthly_stats_stacked(df, category_column, columns_to_display, canvas):
+        # Set 'Category' as the index
 
-    # Define a custom color palette for the bars
-    month_colors = sns.color_palette("Set2", n_colors=len(filtered_rows))
+        # Create a Figure and set the canvas as its figure
+        fig = Figure(figsize=(8, 6))
+        FigureCanvas(fig)
+        canvas2.figure = fig
+        ax = fig.add_subplot(111)
 
-    # Width of each bar group
-    bar_width = 0.15
-    bar_positions = range(len(df.columns[len(df.columns)-13 : -1]))
+        # Select the columns to display based on the given negative column numbers
+        selected_columns = df[df.columns[columns_to_display]]
+        print(selected_columns)
+        # Transpose the DataFrame for grouped bar plotting
+        selected_columns = selected_columns.T
 
-    for index, row in enumerate(filtered_rows.iterrows()):
-        _, row = row
-        totals_row = row[len(df.columns) - 13:-1]
-        bar_positions_grouped = [pos + index * bar_width for pos in bar_positions]
+        # Get the number of categories and months
+        num_categories = len(selected_columns.index)
+        num_months = len(selected_columns.columns)
 
-        # Create the grouped bar
-        plt.bar(bar_positions_grouped, totals_row, label=row[0], width=bar_width, color=month_colors[index])
+        # Set the width of the bars to create space between them
+        bar_width = 0.2
 
-        # Add values on top of the bars
-        for pos, value in zip(bar_positions_grouped, totals_row):
-            plt.text(pos, value, f'{value:.0f}', ha='center', va='bottom', fontsize=10)
+        # Calculate the positions for the bars
+        positions = range(num_months)
 
-    plt.xlabel('Months')
-    plt.ylabel('Total Score')
-    plt.title(f'Monthly Totals for {Campus_name} in 2023', fontsize=14)
+        # Plot the bars for each category
+        for i, category in enumerate(selected_columns.index):
+            x = [p + i * bar_width for p in positions]
+            bar = ax.bar(x, selected_columns.loc[category], bar_width, label=category)
 
-    # Customize the legend
-    # plt.legend(loc='upper right',bbox_to_anchor=(1, 1))
+            # Add labels displaying values at the bottom of the bars
+            for rect in bar:
+                height = rect.get_height()
+                ax.annotate(f'{height:.2f}', xy=(rect.get_x() + rect.get_width() / 2, height), xytext=(0, 3),
+                            textcoords="offset points", ha='center', va='bottom')
 
-    # Customize the x-axis labels
-    plt.xticks([pos + (len(filtered_rows) - 1) * bar_width / 2 for pos in bar_positions],\
-               df.columns[len(df.columns)-13 : -1], rotation=45)
+        # Customize the plot if needed
+        ax.set_ylabel('Pv2 Scores')
+        ax.set_xlabel('Assessment Categories')
+        ax.set_title('Total monthly Category wise Pv2 scores')
+        ax.set_xticks([p + 0.3 * bar_width * (num_categories - 1) for p in positions])
+        ax.set_xticklabels(selected_columns.columns)
+        # Rotate the x-axis tick labels
+        ax.set_xticklabels(selected_columns.columns, rotation=10, ha='right')  # Adjust the rotation angle as needed
 
-    # Get the current axes
-    ax = plt.gca()
+        ax.legend(title='Categories')
 
-    # Create a legend and move it outside the graph
-    legend = ax.legend(loc='upper left', bbox_to_anchor=(1, 1))
-    plt.tight_layout()
-    # Display the plot
-    plt.show()
-
-# Filter rows that meet a certain criteria (adjust this condition as needed)
-
-# plot_total_all_monthly()
-# unique_criterias = df['Criteria of assessment'].unique().tolist()
-# for criteria in unique_criterias :
-#     filtered_rows = df[df['Criteria of assessment'] == criteria]
-#     plot_monthly_stats_pie()
-
-
-# filtered_rows = df[df['Unit of measurement'] == 'Sub Total']
-# plot_monthly_stats_stacked()
-
+        # Draw the plot on the canvas
+        canvas.draw()
 
 # Create Load Excel button
 load_excel_Pv2_button = QPushButton("Load Pv2 Campus File")
@@ -483,17 +625,10 @@ def load_pv2_excel():
 
     # Drop the first row, which is now the column headers
     df = df.iloc[1:].reset_index(drop=True)
+    AssessmentCriterias.addItems(df["Criteria of assessment"].unique().tolist())
+    Criteria = AssessmentCriterias.currentText()
+    AssessmentParameters.addItems(set(df[df["Criteria of assessment"] == Criteria]["Parameters"].unique().tolist()+["All"]))
 
-    if visualization_combo2.currentText()=="Total Monthly Pv2 Scores":
-        plot_total_all_monthly()
-    elif  visualization_combo2.currentText()=="Parameters Wise Scores":
-        filtered_rows = df[df['Unit of measurement'] == 'Sub Total']
-        plot_monthly_stats_stacked()
-    elif  visualization_combo2.currentText()=="Criteria-Wise Monthly Total Scores":
-            unique_criterias = df['Criteria of assessment'].unique().tolist()
-            for criteria in unique_criterias :
-                filtered_rows = df[df['Criteria of assessment'] == criteria]
-                plot_monthly_stats_pie()
 
 left_layout.addWidget(load_excel_Pv2_button)
 left_layout.addWidget(load_excel_Pv2_button)
@@ -501,8 +636,13 @@ load_excel_Pv2_button.clicked.connect(load_pv2_excel)
 
 # Create Visualization combo box
 visualization_combo2 = QComboBox()
-visualization_combo2.addItems(["Total Monthly Pv2 Scores", "Criteria-Wise Monthly Total Scores", \
-                              "Parameters Wise Scores","Deviation (from target closure date)","Reserved1","Reserved1"])
+
+visualization_combo2.addItems(["Total Monthly Pv2 Scores", \
+                               "Criteria-Wise Monthly Total Scores", \
+                              "Parameters wise Pv2 Scores",\
+                               "Deviation (from target closure date)",\
+                               "Reserved1","Reserved1"])
+
 visualization_combo2.setStyleSheet(
     "QComboBox {"
     "background-color: #F0F0F0;"
