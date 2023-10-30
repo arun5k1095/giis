@@ -265,6 +265,19 @@ filter_layout.addRow("Department:", Department_filter_combo)
 filter_layout.addRow(apply_filter_button)
 
 
+def plot_total_weightage(grouped):
+    # Create a new figure and axis
+    fig = canvas2.figure
+    ax = fig.add_subplot(111)
+
+    # Create a pie chart
+    ax.pie(grouped, labels=grouped.index, autopct='%1.1f%%', startangle=140)
+
+    # Set a title for the pie chart
+    ax.set_title('Weightage of Criteria of Assessments')
+
+    # Show the canvas with the pie chart
+    canvas2.draw()
 
 def ArbitratePV2():
     global df,canvas2
@@ -275,18 +288,17 @@ def ArbitratePV2():
 
     if visualization_combo2.currentText() == "Total Monthly Pv2 Scores":
         plot_total_all_monthly()
-    elif visualization_combo2.currentText() == "Parameters wise Pv2 Scores":
-        filtered_rows = df[df['Unit of measurement'] == 'Sub Total']
-        # filtered_rows.to_csv("a.csv")
-        plot_monthly_stats_stacked(filtered_rows ,filtered_months, "Criteria of assessment")
     elif visualization_combo2.currentText() == "Criteria-Wise Monthly Total Scores":
-            # filtered_rows = df[df['Criteria of assessment'] == AssessmentCriterias.currentText()]
-            # plot_monthly_stats_pie()
-            filtered_rows = df[df['Unit of measurement'] == 'Sub Total'].copy()
-            filtered_rows = filtered_rows.set_index("Criteria of assessment")
-            # filtered_rows.to_csv("a.csv")
-            print(filtered_rows)
-            plot_monthly_stats_stacked(filtered_rows, "Criteria of assessment", filtered_months, canvas2)
+        filtered_rows = df[df['Unit of measurement'] == 'Sub Total']
+        plot_monthly_stats_stacked(filtered_rows ,filtered_months, "Criteria of assessment")
+    elif visualization_combo2.currentText() == "Criteria's parameters scores":
+            filtered_rows = df[df['Criteria of assessment'] == AssessmentCriterias.currentText()]
+            plot_Criteria_parameters_line(filtered_rows, filtered_months, "Parameters")
+    elif visualization_combo2.currentText() == "Total Weightage":
+            filtered_rows = df
+            filtered_rows["Total Weightage"].fillna(method='ffill', inplace=True)
+            grouped = filtered_rows.groupby("Criteria of assessment")["Total Weightage"].mean()
+            plot_total_weightage(grouped)
 
 def UpdateAssParameters():
     Criteria = AssessmentCriterias.currentText()
@@ -377,7 +389,7 @@ CriteriaParameters = QComboBox()
 
 filter_layoutPV2.addRow("Select Months:", select_months_button)
 filter_layoutPV2.addRow("Assessment Criteria:", AssessmentCriterias)
-filter_layoutPV2.addRow("Criteria Parameters:", AssessmentParameters)
+# filter_layoutPV2.addRow("Criteria Parameters:", AssessmentParameters)
 # filter_layoutPV2.addRow("Months:", campus_filter_combo)
 # filter_layoutPV2.addRow("Department:", Department_filter_combo)
 filter_layoutPV2.addRow(apply_filter_buttonPV2)
@@ -451,7 +463,6 @@ apply_filter_button.clicked.connect(lambda: visualize_data())
 
 df=pandas.DataFrame()
 
-
 def plot_total_all_monthly():
     global canvas2
     # canvas2 = FigureCanvas(Figure(figsize=(8, 6)))
@@ -488,109 +499,109 @@ def plot_total_all_monthly():
     # Show the plot with a grid
     sns.despine(left=True, bottom=True)  # Remove spines on the left and bottom
     ax.grid(axis='y', linestyle='--', alpha=0.7)
+    canvas2.draw()
     main_window.update()
-    canvas2.update()
 
-def plot_monthly_stats_pie():
+def plot_Criteria_parameters_line(df, months_columns, index_column):
+        index_to_delete = df[df['Unit of measurement'] == 'Sub Total'].index
 
-    plt.figure(figsize=(12, 6))
-    sns.set(style="whitegrid")  # Use Seaborn for an attractive style
+        # Check if "Sub Total" exists in the DataFrame
+        if not index_to_delete.empty:
+            # Get the index label of the first occurrence
+            first_index_to_delete = index_to_delete[0]
 
-    # Define a custom color palette for the bars
-    month_colors = sns.color_palette("Paired", n_colors=len(filtered_rows))
+            # Delete the rows from 'first_index_to_delete' to the end
+            df = df.drop(df.index[first_index_to_delete:])
 
-    # Width of each bar group
-    bar_width = 0.15
-    bar_positions = range(len(selected_months))
+        # Reset the index if needed
 
-    for index, row in enumerate(filtered_rows.iterrows()):
-        _, row = row
-        totals_row = row.iloc[:,filtered_months]
-        bar_positions_grouped = [pos + index * bar_width for pos in bar_positions]
+        fig = canvas2.figure
+        ax = fig.add_subplot(111)
 
-        # Create the grouped bar
-        plt.bar(bar_positions_grouped, totals_row, label=row["Parameters"], width=bar_width, color=month_colors[index])
+        # Create a new figure
+        ax.clear()
 
-        # Add values on top of the bars
-        for pos, value in zip(bar_positions_grouped, totals_row):
-            plt.text(pos, value, f'{value:.0f}', ha='center', va='bottom', fontsize=10)
-
-    plt.xlabel('Months')
-    plt.ylabel('Total Score')
-    plt.title(f'Monthly Totals for {Campus_name} in 2023', fontsize=14)
-
-    # Customize the legend
-    # plt.legend(bbox_to_anchor=(1.05, 1), loc='upper right')
-
-    # Customize the x-axis labels
-    # ax.set_xticks([pos for pos in bar_positions], df.columns[filtered_months], rotation=45)
-
-    # Get the current axes
-    ax = plt.gca()
-
-    # Create a legend and move it outside the graph
-    legend = ax.legend(loc='upper left', bbox_to_anchor=(1, 1))
-    plt.tight_layout()
-
-    # Display the plot
-    plt.show()
-
-# def plot_monthly_stats_stacked(df, category_column, columns_to_display, canvas):
-def plot_monthly_stats_stacked(df, months_columns, index_column):
     # Filter the DataFrame to keep only the specified columns of interest
-
-        print(months_columns)
-        print(index_column)
         df = df.replace("NA", 0)
         df = df.fillna(0)
-        print(df.dtypes)
+
         # Transpose the DataFrame to have months as the index and parameters as columns
         df = df.set_index(index_column)
-
-
         columns_of_interest = months_columns
         df = df.iloc[:, columns_of_interest]
         df = df.T
 
-        # Define colors for different assessment categories
-        colors = ['#FF5733', '#33FF57', '#3398FF', '#FF33C2']
+        # Plot a line for each column on the subplot
+        for column in df.columns:
+            ax.plot(df.index, df[column], marker='o', linestyle='-', label=column)
 
-        # Create a new figure
-        plt.figure(figsize=(12, 6))
-        plt.title('Grouped Bar Graph')
+        # Customize the plot
+        ax.set_title('Line Plot Example')
+        ax.set_xlabel('Date')
+        ax.set_ylabel('Value')
+        ax.grid(True)
 
-        # Set the bar width
-        bar_width = 0.1
+        # Display the legend
+        ax.legend(loc='upper right')
+        canvas2.draw()
 
-        # Set the x-axis positions for bars
-        x = np.arange(len(df.index))
+def plot_monthly_stats_stacked(df, months_columns, index_column):
+    # Filter the DataFrame to keep only the specified columns of interest
+    df = df.replace("NA", 0)
+    df = df.fillna(0)
 
-        # Define spacing between groups
-        group_spacing = 1.2
+    # Transpose the DataFrame to have months as the index and parameters as columns
+    df = df.set_index(index_column)
+    columns_of_interest = months_columns
+    df = df.iloc[:, columns_of_interest]
+    df = df.T
 
-        # Set font size for bar values
-        font_size = 7  # Adjust the font size as needed
+    # Define colors for different assessment categories
+    colors = ['#FF5733', '#33FF57', '#3398FF', '#FF33C2']
 
-        # Loop through the parameters and create the grouped bars with spacing
-        for i, parameter in enumerate(df.columns):
-            plt.bar(x + (i - 1.5) * bar_width * group_spacing, df[parameter], width=bar_width, label=parameter)
+    # Get the figure and axis from the canvas
+    fig = canvas2.figure
+    ax = fig.add_subplot(111)
 
-            # Add bar values on the bars with reduced font size
-            for j, value in enumerate(df[parameter]):
-                plt.text(x[j] + (i - 1.5) * bar_width * group_spacing, value, "{:.1f}".format(value), ha='center', va='bottom',
-                         fontsize=font_size)
+    # Create a new figure
+    ax.clear()
+    ax.set_title('Monthly total of score in each Criteria')
 
-        # Set x-axis labels based on negative column indices
-        months = list(df.index)
-        plt.xlabel('Months')
-        plt.xticks(x, months)
+    # Set the bar width
+    bar_width = 0.1
 
-        # Set legend outside the graph
-        plt.legend(loc='upper center', bbox_to_anchor=(0.5, -0.15), ncol=3)
+    # Set the x-axis positions for bars
+    x = np.arange(len(df.index))
 
-        # Show the plot
-        plt.tight_layout()
-        plt.show()
+    # Define spacing between groups
+    group_spacing = 1.2
+
+    # Set font size for bar values
+    font_size = 7  # Adjust the font size as needed
+
+
+    # Loop through the parameters and create the grouped bars with spacing
+    for i, parameter in enumerate(df.columns):
+        ax.bar(x + (i - 1.5) * bar_width * group_spacing, df[parameter], width=bar_width, label=parameter)
+
+
+        # Add bar values on the bars with reduced font size
+        for j, value in enumerate(df[parameter]):
+            ax.text(x[j] + (i - 1.5) * bar_width * group_spacing, value, "{:.1f}".format(value), ha='center', va='bottom',
+                    fontsize=font_size)
+
+    # Set x-axis labels based on negative column indices
+    months = list(df.index)
+    ax.set_xlabel('Months')
+    ax.set_ylabel('Score')
+    ax.set_xticks(x)
+    ax.set_xticklabels(months)
+
+    # Create the legend
+    ax.legend(fontsize = 7)
+
+    # Show the plot
+    canvas2.draw()
 
 
 # Create Load Excel button
@@ -647,7 +658,8 @@ visualization_combo2 = QComboBox()
 
 visualization_combo2.addItems(["Total Monthly Pv2 Scores", \
                                "Criteria-Wise Monthly Total Scores", \
-                              "Parameters wise Pv2 Scores",\
+                              "Criteria's parameters scores",\
+                               "Total Weightage",\
                                "Deviation (from target closure date)",\
                                "Reserved1","Reserved1"])
 
