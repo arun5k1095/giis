@@ -278,7 +278,7 @@ def ArbitratePV2():
     elif visualization_combo2.currentText() == "Parameters wise Pv2 Scores":
         filtered_rows = df[df['Unit of measurement'] == 'Sub Total']
         # filtered_rows.to_csv("a.csv")
-        plot_monthly_stats_stacked(filtered_rows , "Criteria of assessment",filtered_months , canvas2)
+        plot_monthly_stats_stacked(filtered_rows ,filtered_months, "Criteria of assessment")
     elif visualization_combo2.currentText() == "Criteria-Wise Monthly Total Scores":
             # filtered_rows = df[df['Criteria of assessment'] == AssessmentCriterias.currentText()]
             # plot_monthly_stats_pie()
@@ -535,55 +535,63 @@ def plot_monthly_stats_pie():
     # Display the plot
     plt.show()
 
-def plot_monthly_stats_stacked(df, category_column, columns_to_display, canvas):
-        # Set 'Category' as the index
+# def plot_monthly_stats_stacked(df, category_column, columns_to_display, canvas):
+def plot_monthly_stats_stacked(df, months_columns, index_column):
+    # Filter the DataFrame to keep only the specified columns of interest
 
-        # Create a Figure and set the canvas as its figure
-        fig = Figure(figsize=(8, 6))
-        FigureCanvas(fig)
-        canvas2.figure = fig
-        ax = fig.add_subplot(111)
+        print(months_columns)
+        print(index_column)
+        df = df.replace("NA", 0)
+        df = df.fillna(0)
+        print(df.dtypes)
+        # Transpose the DataFrame to have months as the index and parameters as columns
+        df = df.set_index(index_column)
 
-        # Select the columns to display based on the given negative column numbers
-        selected_columns = df[df.columns[columns_to_display]]
-        print(selected_columns)
-        # Transpose the DataFrame for grouped bar plotting
-        selected_columns = selected_columns.T
 
-        # Get the number of categories and months
-        num_categories = len(selected_columns.index)
-        num_months = len(selected_columns.columns)
+        columns_of_interest = months_columns
+        df = df.iloc[:, columns_of_interest]
+        df = df.T
 
-        # Set the width of the bars to create space between them
-        bar_width = 0.2
+        # Define colors for different assessment categories
+        colors = ['#FF5733', '#33FF57', '#3398FF', '#FF33C2']
 
-        # Calculate the positions for the bars
-        positions = range(num_months)
+        # Create a new figure
+        plt.figure(figsize=(12, 6))
+        plt.title('Grouped Bar Graph')
 
-        # Plot the bars for each category
-        for i, category in enumerate(selected_columns.index):
-            x = [p + i * bar_width for p in positions]
-            bar = ax.bar(x, selected_columns.loc[category], bar_width, label=category)
+        # Set the bar width
+        bar_width = 0.1
 
-            # Add labels displaying values at the bottom of the bars
-            for rect in bar:
-                height = rect.get_height()
-                ax.annotate(f'{height:.2f}', xy=(rect.get_x() + rect.get_width() / 2, height), xytext=(0, 3),
-                            textcoords="offset points", ha='center', va='bottom')
+        # Set the x-axis positions for bars
+        x = np.arange(len(df.index))
 
-        # Customize the plot if needed
-        ax.set_ylabel('Pv2 Scores')
-        ax.set_xlabel('Assessment Categories')
-        ax.set_title('Total monthly Category wise Pv2 scores')
-        ax.set_xticks([p + 0.3 * bar_width * (num_categories - 1) for p in positions])
-        ax.set_xticklabels(selected_columns.columns)
-        # Rotate the x-axis tick labels
-        ax.set_xticklabels(selected_columns.columns, rotation=10, ha='right')  # Adjust the rotation angle as needed
+        # Define spacing between groups
+        group_spacing = 1.2
 
-        ax.legend(title='Categories')
+        # Set font size for bar values
+        font_size = 7  # Adjust the font size as needed
 
-        # Draw the plot on the canvas
-        canvas.draw()
+        # Loop through the parameters and create the grouped bars with spacing
+        for i, parameter in enumerate(df.columns):
+            plt.bar(x + (i - 1.5) * bar_width * group_spacing, df[parameter], width=bar_width, label=parameter)
+
+            # Add bar values on the bars with reduced font size
+            for j, value in enumerate(df[parameter]):
+                plt.text(x[j] + (i - 1.5) * bar_width * group_spacing, value, "{:.1f}".format(value), ha='center', va='bottom',
+                         fontsize=font_size)
+
+        # Set x-axis labels based on negative column indices
+        months = list(df.index)
+        plt.xlabel('Months')
+        plt.xticks(x, months)
+
+        # Set legend outside the graph
+        plt.legend(loc='upper center', bbox_to_anchor=(0.5, -0.15), ncol=3)
+
+        # Show the plot
+        plt.tight_layout()
+        plt.show()
+
 
 # Create Load Excel button
 load_excel_Pv2_button = QPushButton("Load Pv2 Campus File")
